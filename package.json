@@ -1,4 +1,5 @@
 {
-  "name": "hausnation-proxy-vercel",
+  "name": "hausnation-proxy",
+  "version": "1.0.0",
   "private": true
 }

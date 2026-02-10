@@ -1,42 +1,50 @@
-/**
- * HAUSNATION — Odesli Proxy (Vercel Serverless Function)
- * Provider 2/3
- * 
- * Deploy:
- * 1. GitHub'da yeni repo oluştur
- * 2. Bu dosyayı api/proxy.js olarak koy
- * 3. vercel.json dosyasını root'a koy
- * 4. vercel.com'dan import et → Deploy
- * URL: https://PROJE-ADIN.vercel.app/api/proxy?url=SPOTIFY_URL
- */
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export const config = {
+  runtime: 'edge',
+};
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
+export default async function handler(req) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
 
-  const spotifyUrl = req.query.url;
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const spotifyUrl = searchParams.get('url');
 
   if (!spotifyUrl || !spotifyUrl.includes('spotify')) {
-    return res.status(400).json({ error: 'Invalid or missing Spotify URL' });
+    return new Response(JSON.stringify({ error: 'Invalid or missing Spotify URL' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 
   try {
-    const response = await fetch(
+    const res = await fetch(
       `https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(spotifyUrl)}&userCountry=US&songIfSingle=true`,
       { headers: { 'User-Agent': 'HausnationVercel/1.0' } }
     );
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `upstream_${response.status}` });
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: `upstream_${res.status}` }), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
-    const data = await response.json();
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.status(200).json(data);
+    const body = await res.text();
+    return new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders, 'Cache-Control': 'public, max-age=3600' },
+    });
   } catch (e) {
-    return res.status(502).json({ error: 'fetch_failed', message: e.message });
+    return new Response(JSON.stringify({ error: 'fetch_failed', message: e.message }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 }
